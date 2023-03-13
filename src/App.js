@@ -1,19 +1,21 @@
 import React from "react";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 import "./App.css";
 import MoviesList from "./components/MoviesList";
-import Modal from "./components/Modal";
+import AddMovie from "./components/AddMovie.js/AddMovie";
 
 function App() {
   const [movies, setMovies] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setIsError] = useState(null);
-  const url = "https://swapi.dev/api/filmys/";
+  // Star Wars API
   // const url = "https://swapi.dev/api/films/";
+  const url =
+    "https://filmsearcher-http-default-rtdb.firebaseio.com/movies.json";
 
-  async function fetchMoviesHandler() {
-    setIsLoading(!isLoading);
+  const fetchMoviesHandler = useCallback(async function () {
+    setIsLoading(true);
     setIsError(null);
     try {
       const res = await fetch(url);
@@ -22,18 +24,46 @@ function App() {
         throw new Error(`Sth went wrong...${res.status}`);
       }
       const data = await res.json();
-      const transformedDataMovies = data.results.map((transformedMovie) => ({
-        id: transformedMovie.episode_id,
-        title: transformedMovie.title,
-        releaseDate: transformedMovie.release_date,
-        openingText: transformedMovie.opening_crawl,
-      }));
-      setMovies(transformedDataMovies);
+
+      const loadedMovies = [];
+
+      for (const [value, key] of Object.entries(data)) {
+        console.log(key);
+        loadedMovies.push({
+          id: value,
+          title: key.title,
+          releaseDate: key.releaseDate,
+          openingText: key.openingText
+        })
+      }
+
+      setMovies(loadedMovies);
     } catch (error) {
       setIsError(error.message);
     }
     setIsLoading(false);
-  }
+  }, []);
+
+  const addMovieHandler = useCallback(async function (movie) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        body: JSON.stringify(movie),
+        headers: { "Content-Type": "application/json" },
+      })
+      if(res.status !== 200) {
+        throw new Error(`Nie udało się przesłać danych, błąd ${res.status}`)
+      }
+      const data = await res.json();
+      fetchMoviesHandler();
+    } catch (error) {
+      setIsError(error.message)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchMoviesHandler();
+  }, [fetchMoviesHandler]);
 
   let modalInfo = <p>Anything to show...</p>;
   if (movies.length > 0) {
@@ -49,11 +79,12 @@ function App() {
   return (
     <React.Fragment>
       <section>
-        <button onClick={fetchMoviesHandler}>Fetch Movies</button>
+        <AddMovie onAddMovie={addMovieHandler} />
       </section>
       <section>
-        <Modal>{modalInfo}</Modal>
+        <button onClick={fetchMoviesHandler}>Fetch Movies</button>
       </section>
+      <section>{modalInfo}</section>
     </React.Fragment>
   );
 }
